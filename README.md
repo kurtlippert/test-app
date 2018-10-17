@@ -1,4 +1,4 @@
-# IPDB Front-end
+# Elm Parcel Starter
 Example front-end form for the IP database  
 
 ## Setup
