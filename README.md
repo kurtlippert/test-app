@@ -1,5 +1,5 @@
 # Elm Parcel Starter
-Example front-end form for the IP database  
+Starter code using Elm Lang and the parcel module bundler
 
 ## Setup
 **To install yarn package manager, see the link here:**  
