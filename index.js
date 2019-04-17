@@ -1,11 +1,11 @@
+import { Elm } from './src/Main.elm'
+
 if (module.hot) {
     module.hot.dispose(() => {
         window.location.reload();
     });
 }
 
-import('./src/Main.elm')
-    .then(({ Elm }) => {
-        var node = document.querySelector('main');
-        Elm.Main.init({ node: node });
-    });
+Elm.Main.init({
+  node: document.querySelector('main')
+})

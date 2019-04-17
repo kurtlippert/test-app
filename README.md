@@ -1,21 +1,44 @@
-# Elm Parcel Starter
-Starter code using Elm Lang and the parcel module bundler
+# ipweb
+
 
 ## Setup
-**To install yarn package manager, see the link here:**  
-https://yarnpkg.com/lang/en/docs/install/#debian-stable  
-(This will get you started with yarn whatever your environment)
+**Install yarn package manager for your system**  
+_Windows_  
+1. Install Choco (will need local admin)
+2. Install yarn: `Choco install yarn`
+
+_Linux_  
+1. Check your system's package manager, yarn should be available
+2. `yarn <cmd>` (to run stuff)
 
 **Install the parcel module bundler**  
 ```bash
 yarn global add parcel-bundler
 ```  
-**Note** that globally installed modules won't work out-of-the-box with linux or osx. You'll need to add the yarn `bin` folder to your path  
+
+**Install `elm` command-line tools**  
 ```bash
-export PATH="$(yarn global bin):$PATH"
+yarn global add elm
+```  
+
+**Run the project**
+```bash
+yarn start
+```  
+
+## Elm-Format
+Add the following to your (vscode) editor settings:  
+```json
+// windows uses '\\'
+"elm.formatCommand": ".\\node_modules\\.bin\\elm-format",
+"[elm]": {
+    "editor.formatOnSave": true
+}
 ```
 
-**Run the project with parcel**
+## Troubleshooting Tips
+Globally installed npm modules may not work out-of-the-box with linux or osx.  
+Add the yarn `bin` folder to your path  
 ```bash
-parcel index.html
+export PATH="$(yarn global bin):$PATH"
 ```
