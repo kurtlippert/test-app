@@ -47,9 +47,9 @@ type Route
     | AddBatch
     | AddDocument
     | AddResult
-    | Batch Int
-    | Document Int
-    | Result Int
+    | EditBatch Int
+    | EditDocument Int
+    | EditResult Int
     | NotFound
 
 
@@ -67,13 +67,43 @@ type Route
 --     }
 
 
+type alias Batch =
+    { id : String
+    , batchNumber : String
+    , strainConstruct : String
+    , productionDate : String
+    , comment : String
+    }
+
+
+type alias Parameter =
+    { name : String }
+
+
+type alias Step =
+    { name : String
+    , parameters : List Parameter
+    }
+
+
+type alias Document =
+    { id : String
+    , uop : String
+    , docNumber : String
+    , version : String
+    , steps : List Step
+    }
+
+
 type alias Model =
     { authenticate : HttpRequest
     , key : Nav.Key
     , url : Url.Url
     , email : String
     , password : String
+    , loginSuccess : Bool
     , loginFailedMessage : String
+    , batches : List Batch
 
     -- , token : String
     -- , user : User
@@ -92,9 +122,18 @@ type alias Model =
 --     )
 
 
+emptyBatch =
+    { id = ""
+    , batchNumber = ""
+    , strainConstruct = ""
+    , productionDate = ""
+    , comment = ""
+    }
+
+
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( Model Loading key url "" "" "", Cmd.none )
+    ( Model Loading key url "" "" False "" [], Cmd.none )
 
 
 
@@ -109,9 +148,9 @@ routeParser =
         , map AddBatch (s "batch")
         , map AddDocument (s "document")
         , map AddResult (s "result")
-        , map Batch (s "batch" </> int)
-        , map Document (s "document" </> int)
-        , map Result (s "result" </> int)
+        , map EditBatch (s "batch" </> int)
+        , map EditDocument (s "document" </> int)
+        , map EditResult (s "result" </> int)
         ]
 
 
@@ -309,8 +348,6 @@ update msg model =
                 , headers = [ Http.header "AUTHORIZATION" (Base64.encode (model.email ++ ":" ++ model.password)) ]
                 , url = "http://localhost:1337/ipweb/login"
                 , body = Http.emptyBody
-
-                -- , expect = Http.expectJson GotResult (Json.Decode.field "token" Json.Decode.string)
                 , expect = Http.expectJson GotResult loginDecoder
                 , timeout = Nothing
                 , tracker = Nothing
@@ -332,8 +369,14 @@ update msg model =
                             case loginResponse.token of
                                 Just token ->
                                     case loginResponse.user of
+                                        -- we want to login, redirect, and fetch resources (3 commands)
                                         Just user ->
-                                            ( { model | authenticate = Success loginResponse, loginFailedMessage = "" }, Cache.cache <| tokenUserEncoder token user )
+                                            ( { model | authenticate = Success loginResponse, loginFailedMessage = "", loginSuccess = True }
+                                            , Cmd.batch
+                                                [ Cache.cache <| tokenUserEncoder token user
+                                                , Nav.pushUrl model.key "/"
+                                                ]
+                                            )
 
                                         Nothing ->
                                             ( model, Cmd.none )
@@ -415,11 +458,26 @@ loginForm model =
         ]
 
 
+userInfo : Model -> Html Msg
+userInfo model =
+    div [] []
+
+
+topNav : Model -> Html Msg
+topNav model =
+    nav [ class "navbar navbar-light bg-light" ]
+        [ a [ class "navbar-brand" ]
+            [ text "IP Web" ]
+        , userInfo model
+        ]
+
+
 view : Model -> Browser.Document Msg
 view model =
     { title = "IP Web"
     , body =
-        [ div [ class "container my-5" ]
+        [ topNav model
+        , div [ class "container my-5" ]
             [ loginForm model
             , text "The current URL is: "
             , b [] [ text (Url.toString model.url) ]
