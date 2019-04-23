@@ -35,10 +35,21 @@ main =
 -- MODEL
 
 
+type HttpResponse
+    = LoginResponse LoginResponsePayload
+
+
 type HttpRequest
     = Failure
     | Loading
-    | Success LoginResponse
+    | Success HttpResponse
+
+
+
+-- type LoginRequest User
+--     = Failure
+--     | Loading
+--     | Success User
 
 
 type Route
@@ -51,20 +62,6 @@ type Route
     | EditDocument Int
     | EditResult Int
     | NotFound
-
-
-
--- type alias Membership =
---     { super : Bool
---     , basic : Bool
---     , review : Bool
---     , dataEntry : Bool
---     , staff : Bool
---     }
--- type alias User =
---     { email : String
---     , membership : Membership
---     }
 
 
 type alias Batch =
@@ -96,7 +93,7 @@ type alias Document =
 
 
 type alias Model =
-    { authenticate : HttpRequest
+    { httpRequest : HttpRequest
     , key : Nav.Key
     , url : Url.Url
     , email : String
@@ -104,22 +101,7 @@ type alias Model =
     , loginSuccess : Bool
     , loginFailedMessage : String
     , batches : List Batch
-
-    -- , token : String
-    -- , user : User
     }
-
-
-
--- INIT
--- init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
--- init flags url key =
---     ( Model Loading key url
---     , Http.get
---         { url = "http://localhost:1337/ipweb/get_batches"
---         , expect = Http.expectString GotText
---         }
---     )
 
 
 emptyBatch =
@@ -159,22 +141,6 @@ fromUrl url =
     Maybe.withDefault NotFound (Url.Parser.parse routeParser url)
 
 
-
--- authenticate : Model -> Cmd Msg
--- authenticate model =
---     Http.request
---         { method = "POST"
---         , headers = [ Http.header "AUTHORIZATION" (Base64.encode (model.email ++ ":" ++ model.password)) ]
---         , url = "http://localhost:1337/ipweb/login"
---         , body = Http.emptyBody
---         -- , expect = Http.expectJson GotJson
---         , expect = Http.expectString GotText
---         , timeout = Nothing
---         , tracker = Nothing
---         }
--- UPDATE
-
-
 type alias Membership =
     { super : Bool
     , basic : Bool
@@ -184,21 +150,35 @@ type alias Membership =
     }
 
 
+
+-- type alias UserInfo =
+--     { email : String
+--     , membership : Membership
+--     }
+-- type alias LoginResponse =
+--     { token : Maybe String
+--     , email : Maybe String
+--     , membership : Maybe Membership
+--     , message : Maybe String
+--     }
+
+
 type alias User =
-    { email : String
+    { token : String
+    , email : String
     , membership : Membership
     }
 
 
-type alias LoginResponse =
-    { token : Maybe String
-    , user : Maybe User
+type alias LoginResponsePayload =
+    { user : Maybe User
     , message : Maybe String
     }
 
 
 emptyUser =
-    { email = ""
+    { token = ""
+    , email = ""
     , membership =
         { super = False
         , basic = False
@@ -211,25 +191,33 @@ emptyUser =
 
 membershipDecoder : Decoder Membership
 membershipDecoder =
-    Json.Decode.succeed Membership
-        |> required "super" Json.Decode.bool
-        |> required "basic" Json.Decode.bool
-        |> required "review" Json.Decode.bool
-        |> required "data_entry" Json.Decode.bool
-        |> required "staff" Json.Decode.bool
+    Json.Decode.map5 Membership
+        (Json.Decode.field "super" Json.Decode.bool)
+        (Json.Decode.field "basic" Json.Decode.bool)
+        (Json.Decode.field "review" Json.Decode.bool)
+        (Json.Decode.field "data_entry" Json.Decode.bool)
+        (Json.Decode.field "staff" Json.Decode.bool)
+
+
+
+-- userInfoDecoder : Decoder UserInfo
+-- userInfoDecoder =
+--     Json.Decode.map2 UserInfo
+--         (Json.Decode.field "email" Json.Decode.string)
+--         (Json.Decode.field "membership" membershipDecoder)
 
 
 userDecoder : Decoder User
 userDecoder =
-    Json.Decode.succeed User
-        |> required "email" Json.Decode.string
-        |> required "membership" membershipDecoder
+    Json.Decode.map3 User
+        (Json.Decode.field "token" Json.Decode.string)
+        (Json.Decode.field "email" Json.Decode.string)
+        (Json.Decode.field "membership" membershipDecoder)
 
 
-loginDecoder : Decoder LoginResponse
-loginDecoder =
-    Json.Decode.map3 LoginResponse
-        (Json.Decode.maybe (Json.Decode.field "token" Json.Decode.string))
+loginResponsePayloadDecoder : Decoder LoginResponsePayload
+loginResponsePayloadDecoder =
+    Json.Decode.map2 LoginResponsePayload
         (Json.Decode.maybe (Json.Decode.field "user" userDecoder))
         (Json.Decode.maybe (Json.Decode.field "message" Json.Decode.string))
 
@@ -237,62 +225,57 @@ loginDecoder =
 membershipEncoder : Membership -> Json.Encode.Value
 membershipEncoder membership =
     Json.Encode.object
-        [ ( "super", Json.Encode.bool <| membership.super )
-        , ( "basic", Json.Encode.bool <| membership.basic )
-        , ( "review", Json.Encode.bool <| membership.review )
-        , ( "dataEntry", Json.Encode.bool <| membership.dataEntry )
-        , ( "staff", Json.Encode.bool <| membership.staff )
+        [ ( "super", Json.Encode.bool membership.super )
+        , ( "basic", Json.Encode.bool membership.basic )
+        , ( "review", Json.Encode.bool membership.review )
+        , ( "dataEntry", Json.Encode.bool membership.dataEntry )
+        , ( "staff", Json.Encode.bool membership.staff )
         ]
+
+
+
+-- userInfoEncoder : UserInfo -> Json.Encode.Value
+-- userInfoEncoder userInfo =
+--     Json.Encode.object
+--         [ ( "email", Json.Encode.string <| userInfo.email )
+--         , ( "membership", membershipEncoder <| userInfo.membership )
+--         ]
 
 
 userEncoder : User -> Json.Encode.Value
 userEncoder user =
     Json.Encode.object
-        [ ( "email", Json.Encode.string <| user.email )
-        , ( "membership", membershipEncoder <| user.membership )
-        ]
-
-
-tokenUserEncoder : String -> User -> Json.Encode.Value
-tokenUserEncoder token user =
-    Json.Encode.object
-        [ ( "token", Json.Encode.string <| token )
-        , ( "user", userEncoder <| user )
+        [ ( "token", Json.Encode.string user.token )
+        , ( "email", Json.Encode.string user.email )
+        , ( "membership", membershipEncoder user.membership )
         ]
 
 
 
--- loginResponseEncoder : LoginResponse -> Json.Encode.Value
--- loginResponseEncoder loginResponse =
+-- tokenUserEncoder : String -> User -> Json.Encode.Value
+-- tokenUserEncoder token user =
 --     Json.Encode.object
---         [ ( "token", Json.Encode.string <| loginResponse.token )
---         , ( "user", userEncoder <| loginResponse.user )
+--         [ ( "token", Json.Encode.string <| token )
+--         , ( "user", u <| user )
 --         ]
--- Json.Decode.succeed LoginResponse
---     |> optional "message" Json.Decode.string ""
---     |> optional "token" Json.Decode.string ""
---     |> optional "user" userDecoder emptyUser
--- (Json.Decode.maybe (Json.Decode.field "token" Json.Decode.string))
--- (Json.Decode.maybe (Json.Decode.field "user" Json.Decode.string))
--- (Json.Decode.maybe (Json.Decode.field "message" Json.Decode.string))
--- { Json.Decode.field "token" Json.Decode.maybe
--- , Json.Decode.field "message" Json.Decode.maybe
--- }
--- [ Json.Decode.dict "token" Json.Decode.string
--- , Json.Decode.field "message" Json.Decode.string
--- ]
--- Json.Decode.succeed String
---     |> optional "token" Json.Decode.string "(no login token)"
---     |> optional "message" Json.Decode.string "(no message)"
 
 
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | GotResult (Result Http.Error LoginResponse)
+    | LoginRequest
+    | GotLoginResponse (Result Http.Error LoginResponsePayload)
     | SetEmail String
     | SetPassword String
-    | GetAuthToken
+    | GotCache Json.Encode.Value
+
+
+
+-- fetchResources : Cmd msg
+-- fetchResources =
+--     let
+--         cache = Cache.getCache
+--     in
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -307,16 +290,6 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            -- let
-            --     -- _ =
-            --     --     Debug.log "url" url
-            --     _ =
-            --         Debug.log "params" fromUrl url
-            -- in
-            -- let
-            -- _ =
-            --     Debug.log "route" (toString (fromUrl url))
-            -- in
             case fromUrl url of
                 NotFound ->
                     ( model, Cmd.none )
@@ -341,51 +314,67 @@ update msg model =
         SetPassword password ->
             ( { model | password = password }, Cmd.none )
 
-        GetAuthToken ->
+        LoginRequest ->
             ( model
             , Http.request
                 { method = "POST"
                 , headers = [ Http.header "AUTHORIZATION" (Base64.encode (model.email ++ ":" ++ model.password)) ]
                 , url = "http://localhost:1337/ipweb/login"
                 , body = Http.emptyBody
-                , expect = Http.expectJson GotResult loginDecoder
+                , expect = Http.expectJson GotLoginResponse loginResponsePayloadDecoder
                 , timeout = Nothing
                 , tracker = Nothing
                 }
             )
 
-        GotResult result ->
+        GotLoginResponse loginResponsePayload ->
             let
                 _ =
-                    Debug.log "result" result
+                    Debug.log "login_response_payload" loginResponsePayload
             in
-            case result of
-                Ok loginResponse ->
-                    case loginResponse.message of
+            case loginResponsePayload of
+                Ok payload ->
+                    case payload.message of
                         Just message ->
-                            ( { model | authenticate = Success loginResponse, loginFailedMessage = message }, Cmd.none )
+                            ( { model | httpRequest = Success <| LoginResponse payload, loginFailedMessage = message }, Cmd.none )
 
+                        -- because no message implies we successfully logged in
+                        -- may want to change the api on that later (?)
                         Nothing ->
-                            case loginResponse.token of
-                                Just token ->
-                                    case loginResponse.user of
-                                        -- we want to login, redirect, and fetch resources (3 commands)
-                                        Just user ->
-                                            ( { model | authenticate = Success loginResponse, loginFailedMessage = "", loginSuccess = True }
-                                            , Cmd.batch
-                                                [ Cache.cache <| tokenUserEncoder token user
-                                                , Nav.pushUrl model.key "/"
-                                                ]
-                                            )
+                            case payload.user of
+                                Just user ->
+                                    -- case responsePayload.user of
+                                    --     -- we want to login, redirect, and fetch resources (3 commands)
+                                    --     Just user ->
+                                    --         ( { model | authenticate = Success loginResponse, loginFailedMessage = "", loginSuccess = True }
+                                    --         , Cmd.batch
+                                    --             [ Cache.cache <| tokenUserEncoder token user
+                                    --             , Nav.pushUrl model.key "/"
+                                    --             -- , Cache.getCache
+                                    --             ]
+                                    --         )
+                                    --     Nothing ->
+                                    --         ( model, Cmd.none )
+                                    ( { model | httpRequest = Success <| LoginResponse payload, loginFailedMessage = "", loginSuccess = True }
+                                    , Cmd.batch
+                                        [ Cache.cache <| userEncoder user
+                                        , Nav.pushUrl model.key "/"
+                                        ]
+                                    )
 
-                                        Nothing ->
-                                            ( model, Cmd.none )
-
+                                -- No message, but unable to get user (when would this happen?)
                                 Nothing ->
-                                    ( model, Cmd.none )
+                                    ( { model | loginFailedMessage = "Unable to properly get user information!" }, Cmd.none )
 
                 Err _ ->
-                    ( { model | authenticate = Failure }, Cmd.none )
+                    ( { model | httpRequest = Failure }, Cmd.none )
+
+        GotCache cache ->
+            let
+                _ =
+                    Debug.log "cache" cache
+            in
+            ( model, Cmd.none )
 
 
 
@@ -394,6 +383,7 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
+    -- fromCache GotCache
     Sub.none
 
 
@@ -406,19 +396,21 @@ viewLink path =
     li [] [ a [ href path ] [ text path ] ]
 
 
-ajaxResponse : HttpRequest -> Html Msg
-ajaxResponse httpRequest =
+failureMessages : HttpRequest -> Html Msg
+failureMessages httpRequest =
     case httpRequest of
         Failure ->
             div [ class "alert alert-danger" ] [ text "Unable to contact the server" ]
 
         Success response ->
-            case response.message of
-                Just message ->
-                    div [ class "alert alert-danger" ] [ text message ]
+            case response of
+                LoginResponse payload ->
+                    case payload.message of
+                        Just message ->
+                            div [ class "alert alert-danger" ] [ text message ]
 
-                _ ->
-                    div [] []
+                        _ ->
+                            div [] []
 
         _ ->
             div [] []
@@ -452,7 +444,7 @@ loginForm model =
             [ type_ "button"
             , class "btn btn-primary"
             , Html.Attributes.required True
-            , onClick GetAuthToken
+            , onClick LoginRequest
             ]
             [ text "Submit" ]
         ]
@@ -488,7 +480,7 @@ view model =
                 , viewLink "/batch/1"
                 , viewLink "/document/2"
                 ]
-            , ajaxResponse model.authenticate
+            , failureMessages model.httpRequest
             ]
         ]
     }

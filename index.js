@@ -6,20 +6,23 @@ if (module.hot) {
     });
 }
 
-var app = Elm.Main.init({
-  node: document.querySelector('main')
+const storedState = localStorage.getItem('cache')
+const startingState = storedState ? localStorage.getItem('cache') : null
+const app = Elm.Main.init({
+  node: document.querySelector('main'),
+  flags: startingState,
 })
-
-// console.log(app)
 
 app.ports.cache.subscribe((data) => {
   console.log(data)
-  return localStorage.setItem('cache', JSON.stringify(data))
+  localStorage.setItem('cache', JSON.stringify(data))
 })
 
-// app.ports.getFromCache.sends((key) =>
-//   localStorage.getItem(key)
-// )
+// app.ports.getCache.subscribe(() => {
+//   console.log(localStorage.getItem('cache'))
+//   app.ports.fromCache.send(localStorage.getItem('cache'))
+//   // return localStorage.getItem('cache')
+// })
 
 // app.ports.clearCache.subscribe(() =>
 //   localStorage.clear()
