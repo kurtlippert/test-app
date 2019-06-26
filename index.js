@@ -15,7 +15,7 @@ const app = Elm.Main.init({
 
 app.ports.cache.subscribe((data) => {
   console.log(data)
-  localStorage.setItem('cache', JSON.stringify(data))
+  // localStorage.setItem('cache', JSON.stringify(data))
 })
 
 // app.ports.getCache.subscribe(() => {

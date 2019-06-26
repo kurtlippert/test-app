@@ -1,9 +1,8 @@
-module Main exposing (Model, Msg(..), init, main, update, view)
+port module Main exposing (HttpRequest(..), HttpResponse(..), LoginResponsePayload, Membership, Model, Msg(..), Route(..), User, emptyUser, failureMessages, fromUrl, init, loginResponsePayloadDecoder, main, membershipDecoder, membershipEncoder, routeParser, setStorage, subscriptions, topNav, update, updateWithStorage, userDecoder, userEncoder, view, viewLink)
 
 import Base64
 import Browser
 import Browser.Navigation as Nav
-import Cache exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -19,7 +18,7 @@ import Url.Parser exposing ((</>), Parser, int, map, oneOf, s, string, top)
 -- MAIN
 
 
-main : Program () Model Msg
+main : Program (Maybe Model) Model Msg
 main =
     Browser.application
         { init = init
@@ -29,6 +28,20 @@ main =
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         }
+
+
+port cache : Json.Encode.Value -> Cmd msg
+
+
+updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
+updateWithStorage msg model =
+    let
+        ( newModel, cmds ) =
+            update msg model
+    in
+    ( newModel
+    , Cmd.batch [ cache newModel, cmds ]
+    )
 
 
 
@@ -45,77 +58,24 @@ type HttpRequest
     | Success HttpResponse
 
 
-
--- type LoginRequest User
---     = Failure
---     | Loading
---     | Success User
-
-
 type Route
     = Home
     | Login
-    | AddBatch
-    | AddDocument
-    | AddResult
-    | EditBatch Int
-    | EditDocument Int
-    | EditResult Int
+    | About
+    | Users
     | NotFound
-
-
-type alias Batch =
-    { id : String
-    , batchNumber : String
-    , strainConstruct : String
-    , productionDate : String
-    , comment : String
-    }
-
-
-type alias Parameter =
-    { name : String }
-
-
-type alias Step =
-    { name : String
-    , parameters : List Parameter
-    }
-
-
-type alias Document =
-    { id : String
-    , uop : String
-    , docNumber : String
-    , version : String
-    , steps : List Step
-    }
 
 
 type alias Model =
     { httpRequest : HttpRequest
     , key : Nav.Key
     , url : Url.Url
-    , email : String
-    , password : String
-    , loginSuccess : Bool
-    , loginFailedMessage : String
-    , batches : List Batch
-    }
-
-
-emptyBatch =
-    { id = ""
-    , batchNumber = ""
-    , strainConstruct = ""
-    , productionDate = ""
-    , comment = ""
     }
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( Model Loading key url "" "" False "" [], Cmd.none )
+    ( Model Loading key url, Cmd.none )
 
 
 
@@ -126,13 +86,8 @@ routeParser : Parser (Route -> a) a
 routeParser =
     oneOf
         [ map Home top
-        , map Login (s "login")
-        , map AddBatch (s "batch")
-        , map AddDocument (s "document")
-        , map AddResult (s "result")
-        , map EditBatch (s "batch" </> int)
-        , map EditDocument (s "document" </> int)
-        , map EditResult (s "result" </> int)
+        , map About (s "about")
+        , map Users (s "users")
         ]
 
 
@@ -263,10 +218,6 @@ userEncoder user =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | LoginRequest
-    | GotLoginResponse (Result Http.Error LoginResponsePayload)
-    | SetEmail String
-    | SetPassword String
     | GotCache Json.Encode.Value
 
 
@@ -280,10 +231,18 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    -- let
+    --     _ =
+    --         Debug.log "msg" msg
+    -- in
     case msg of
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
+                    -- let
+                    --     _ =
+                    --         Debug.log "url" url
+                    -- in
                     ( model, Nav.pushUrl model.key (Url.toString url) )
 
                 Browser.External href ->
@@ -304,70 +263,13 @@ update msg model =
                     )
 
                 _ ->
+                    let
+                        _ =
+                            Debug.log "url" url
+                    in
                     ( { model | url = url }
                     , Cmd.none
                     )
-
-        SetEmail email ->
-            ( { model | email = email }, Cmd.none )
-
-        SetPassword password ->
-            ( { model | password = password }, Cmd.none )
-
-        LoginRequest ->
-            ( model
-            , Http.request
-                { method = "POST"
-                , headers = [ Http.header "AUTHORIZATION" (Base64.encode (model.email ++ ":" ++ model.password)) ]
-                , url = "http://localhost:1337/ipweb/login"
-                , body = Http.emptyBody
-                , expect = Http.expectJson GotLoginResponse loginResponsePayloadDecoder
-                , timeout = Nothing
-                , tracker = Nothing
-                }
-            )
-
-        GotLoginResponse loginResponsePayload ->
-            let
-                _ =
-                    Debug.log "login_response_payload" loginResponsePayload
-            in
-            case loginResponsePayload of
-                Ok payload ->
-                    case payload.message of
-                        Just message ->
-                            ( { model | httpRequest = Success <| LoginResponse payload, loginFailedMessage = message }, Cmd.none )
-
-                        -- because no message implies we successfully logged in
-                        -- may want to change the api on that later (?)
-                        Nothing ->
-                            case payload.user of
-                                Just user ->
-                                    -- case responsePayload.user of
-                                    --     -- we want to login, redirect, and fetch resources (3 commands)
-                                    --     Just user ->
-                                    --         ( { model | authenticate = Success loginResponse, loginFailedMessage = "", loginSuccess = True }
-                                    --         , Cmd.batch
-                                    --             [ Cache.cache <| tokenUserEncoder token user
-                                    --             , Nav.pushUrl model.key "/"
-                                    --             -- , Cache.getCache
-                                    --             ]
-                                    --         )
-                                    --     Nothing ->
-                                    --         ( model, Cmd.none )
-                                    ( { model | httpRequest = Success <| LoginResponse payload, loginFailedMessage = "", loginSuccess = True }
-                                    , Cmd.batch
-                                        [ Cache.cache <| userEncoder user
-                                        , Nav.pushUrl model.key "/"
-                                        ]
-                                    )
-
-                                -- No message, but unable to get user (when would this happen?)
-                                Nothing ->
-                                    ( { model | loginFailedMessage = "Unable to properly get user information!" }, Cmd.none )
-
-                Err _ ->
-                    ( { model | httpRequest = Failure }, Cmd.none )
 
         GotCache cache ->
             let
@@ -391,9 +293,10 @@ subscriptions _ =
 -- VIEW
 
 
-viewLink : String -> Html msg
-viewLink path =
-    li [] [ a [ href path ] [ text path ] ]
+viewLink : String -> String -> List String -> Html msg
+viewLink path name classes =
+    a [ class <| String.join " " classes, href path ]
+        [ text name ]
 
 
 failureMessages : HttpRequest -> Html Msg
@@ -416,51 +319,24 @@ failureMessages httpRequest =
             div [] []
 
 
-loginForm : Model -> Html Msg
-loginForm model =
-    div [ class "mb-5" ]
-        [ h2 [] [ text "Login" ]
-        , div [ class "form-group" ]
-            [ label [] [ text "Email" ]
-            , input
-                [ type_ "text"
-                , class "form-control"
-                , Html.Attributes.required True
-                , onInput SetEmail
-                ]
-                []
-            ]
-        , div [ class "form-group" ]
-            [ label [] [ text "Password" ]
-            , input
-                [ type_ "password"
-                , class "form-control"
-                , Html.Attributes.required True
-                , onInput SetPassword
-                ]
-                []
-            ]
-        , button
-            [ type_ "button"
-            , class "btn btn-primary"
-            , Html.Attributes.required True
-            , onClick LoginRequest
-            ]
-            [ text "Submit" ]
-        ]
-
-
-userInfo : Model -> Html Msg
-userInfo model =
-    div [] []
-
-
 topNav : Model -> Html Msg
 topNav model =
-    nav [ class "navbar navbar-light bg-light" ]
+    nav [ class "navbar navbar-expand-sm navbar-light bg-light" ]
         [ a [ class "navbar-brand" ]
-            [ text "IP Web" ]
-        , userInfo model
+            [ text "Elm Parcel Starter" ]
+        , div []
+            [ ul [ class "navbar-nav" ]
+                [ li [ class "nav-item" ]
+                    [ viewLink "/" "Home" [ "nav-link" ]
+                    ]
+                , li [ class "nav-item" ]
+                    [ viewLink "/about" "About" [ "nav-link" ]
+                    ]
+                , li [ class "nav-item" ]
+                    [ viewLink "/users" "Users" [ "nav-link" ]
+                    ]
+                ]
+            ]
         ]
 
 
@@ -470,17 +346,9 @@ view model =
     , body =
         [ topNav model
         , div [ class "container my-5" ]
-            [ loginForm model
-            , text "The current URL is: "
+            [ text "The current URL is: "
             , b [] [ text (Url.toString model.url) ]
-            , ul []
-                [ viewLink "/"
-                , viewLink "/login"
-                , viewLink "/batch"
-                , viewLink "/batch/1"
-                , viewLink "/document/2"
-                ]
-            , failureMessages model.httpRequest
+            , hr [] []
             ]
         ]
     }
