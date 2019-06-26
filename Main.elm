@@ -1,4 +1,4 @@
-port module Main exposing (HttpRequest(..), HttpResponse(..), LoginResponsePayload, Membership, Model, Msg(..), Route(..), User, emptyUser, failureMessages, fromUrl, init, loginResponsePayloadDecoder, main, membershipDecoder, membershipEncoder, routeParser, setStorage, subscriptions, topNav, update, updateWithStorage, userDecoder, userEncoder, view, viewLink)
+module Main exposing (HttpRequest(..), Model, Msg(..), Route(..), User, emptyUser, failureMessages, fromUrl, init, main, routeParser, subscriptions, topNav, update, userDecoder, view, viewLink)
 
 import Base64
 import Browser
@@ -18,7 +18,7 @@ import Url.Parser exposing ((</>), Parser, int, map, oneOf, s, string, top)
 -- MAIN
 
 
-main : Program (Maybe Model) Model Msg
+main : Program () Model Msg
 main =
     Browser.application
         { init = init
@@ -30,32 +30,16 @@ main =
         }
 
 
-port cache : Json.Encode.Value -> Cmd msg
-
-
-updateWithStorage : Msg -> Model -> ( Model, Cmd Msg )
-updateWithStorage msg model =
-    let
-        ( newModel, cmds ) =
-            update msg model
-    in
-    ( newModel
-    , Cmd.batch [ cache newModel, cmds ]
-    )
-
-
 
 -- MODEL
-
-
-type HttpResponse
-    = LoginResponse LoginResponsePayload
+-- type HttpResponse
+--     = UsersResponse (List User)
 
 
 type HttpRequest
     = Failure
     | Loading
-    | Success HttpResponse
+    | Success
 
 
 type Route
@@ -68,6 +52,7 @@ type Route
 
 type alias Model =
     { httpRequest : HttpRequest
+    , users : List User
     , key : Nav.Key
     , url : Url.Url
     }
@@ -75,7 +60,7 @@ type alias Model =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( Model Loading key url, Cmd.none )
+    ( Model Loading [] key url, getUsersRequest )
 
 
 
@@ -96,13 +81,17 @@ fromUrl url =
     Maybe.withDefault NotFound (Url.Parser.parse routeParser url)
 
 
-type alias Membership =
-    { super : Bool
-    , basic : Bool
-    , review : Bool
-    , dataEntry : Bool
-    , staff : Bool
-    }
+getUsersRequest : Cmd Msg
+getUsersRequest =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url = "https://api.github.com/users"
+        , body = Http.emptyBody
+        , expect = Http.expectJson GotUsers usersDecoder
+        , timeout = Nothing
+        , tracker = Nothing
+        }
 
 
 
@@ -119,130 +108,59 @@ type alias Membership =
 
 
 type alias User =
-    { token : String
-    , email : String
-    , membership : Membership
-    }
-
-
-type alias LoginResponsePayload =
-    { user : Maybe User
-    , message : Maybe String
+    { id : Int
+    , url : String
+    , login : String
+    , avatarUrl : String
     }
 
 
 emptyUser =
-    { token = ""
-    , email = ""
-    , membership =
-        { super = False
-        , basic = False
-        , review = False
-        , dataEntry = False
-        , staff = False
-        }
+    { id = 0
+    , url = ""
+    , login = ""
+    , avatarUrl = ""
     }
-
-
-membershipDecoder : Decoder Membership
-membershipDecoder =
-    Json.Decode.map5 Membership
-        (Json.Decode.field "super" Json.Decode.bool)
-        (Json.Decode.field "basic" Json.Decode.bool)
-        (Json.Decode.field "review" Json.Decode.bool)
-        (Json.Decode.field "data_entry" Json.Decode.bool)
-        (Json.Decode.field "staff" Json.Decode.bool)
-
-
-
--- userInfoDecoder : Decoder UserInfo
--- userInfoDecoder =
---     Json.Decode.map2 UserInfo
---         (Json.Decode.field "email" Json.Decode.string)
---         (Json.Decode.field "membership" membershipDecoder)
 
 
 userDecoder : Decoder User
 userDecoder =
-    Json.Decode.map3 User
-        (Json.Decode.field "token" Json.Decode.string)
-        (Json.Decode.field "email" Json.Decode.string)
-        (Json.Decode.field "membership" membershipDecoder)
+    Json.Decode.map4 User
+        (Json.Decode.field "id" Json.Decode.int)
+        (Json.Decode.field "url" Json.Decode.string)
+        (Json.Decode.field "login" Json.Decode.string)
+        (Json.Decode.field "avatar_url" Json.Decode.string)
 
 
-loginResponsePayloadDecoder : Decoder LoginResponsePayload
-loginResponsePayloadDecoder =
-    Json.Decode.map2 LoginResponsePayload
-        (Json.Decode.maybe (Json.Decode.field "user" userDecoder))
-        (Json.Decode.maybe (Json.Decode.field "message" Json.Decode.string))
-
-
-membershipEncoder : Membership -> Json.Encode.Value
-membershipEncoder membership =
-    Json.Encode.object
-        [ ( "super", Json.Encode.bool membership.super )
-        , ( "basic", Json.Encode.bool membership.basic )
-        , ( "review", Json.Encode.bool membership.review )
-        , ( "dataEntry", Json.Encode.bool membership.dataEntry )
-        , ( "staff", Json.Encode.bool membership.staff )
-        ]
+usersDecoder : Decoder (List User)
+usersDecoder =
+    Json.Decode.list userDecoder
 
 
 
--- userInfoEncoder : UserInfo -> Json.Encode.Value
--- userInfoEncoder userInfo =
+-- userEncoder : User -> Json.Encode.Value
+-- userEncoder user =
 --     Json.Encode.object
---         [ ( "email", Json.Encode.string <| userInfo.email )
---         , ( "membership", membershipEncoder <| userInfo.membership )
---         ]
-
-
-userEncoder : User -> Json.Encode.Value
-userEncoder user =
-    Json.Encode.object
-        [ ( "token", Json.Encode.string user.token )
-        , ( "email", Json.Encode.string user.email )
-        , ( "membership", membershipEncoder user.membership )
-        ]
-
-
-
--- tokenUserEncoder : String -> User -> Json.Encode.Value
--- tokenUserEncoder token user =
---     Json.Encode.object
---         [ ( "token", Json.Encode.string <| token )
---         , ( "user", u <| user )
+--         [ ( "id", Json.Encode.string user.id )
+--         , ( "url", Json.Encode.string user.url )
+--         , ( "login", Json.Encode.string user.login )
+--         , ( "avatar_url", Json.Encode.string user.avatarUrl )
 --         ]
 
 
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | GotCache Json.Encode.Value
-
-
-
--- fetchResources : Cmd msg
--- fetchResources =
---     let
---         cache = Cache.getCache
---     in
+    | GetUsers
+    | GotUsers (Result Http.Error (List User))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    -- let
-    --     _ =
-    --         Debug.log "msg" msg
-    -- in
     case msg of
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
-                    -- let
-                    --     _ =
-                    --         Debug.log "url" url
-                    -- in
                     ( model, Nav.pushUrl model.key (Url.toString url) )
 
                 Browser.External href ->
@@ -253,33 +171,30 @@ update msg model =
                 NotFound ->
                     ( model, Cmd.none )
 
-                Login ->
-                    let
-                        _ =
-                            Debug.log "route" "login"
-                    in
-                    ( { model | url = url }
-                    , Cmd.none
-                    )
-
                 _ ->
-                    let
-                        _ =
-                            Debug.log "url" url
-                    in
                     ( { model | url = url }
                     , Cmd.none
                     )
 
-        GotCache cache ->
-            let
-                _ =
-                    Debug.log "cache" cache
-            in
-            ( model, Cmd.none )
+        GetUsers ->
+            ( model, getUsersRequest )
+
+        GotUsers response ->
+            case response of
+                Ok users ->
+                    ( { model | httpRequest = Success, users = users }, Cmd.none )
+
+                Err _ ->
+                    ( { model | httpRequest = Failure }, Cmd.none )
 
 
 
+-- GotCache cache ->
+--     let
+--         _ =
+--             Debug.log "cache" cache
+--     in
+--     ( model, Cmd.none )
 -- SUBSCRIPTIONS
 
 
@@ -304,16 +219,6 @@ failureMessages httpRequest =
     case httpRequest of
         Failure ->
             div [ class "alert alert-danger" ] [ text "Unable to contact the server" ]
-
-        Success response ->
-            case response of
-                LoginResponse payload ->
-                    case payload.message of
-                        Just message ->
-                            div [ class "alert alert-danger" ] [ text message ]
-
-                        _ ->
-                            div [] []
 
         _ ->
             div [] []
@@ -340,6 +245,32 @@ topNav model =
         ]
 
 
+userTable : Model -> Html Msg
+userTable model =
+    table [ class "table" ]
+        [ thead []
+            [ tr []
+                [ th [ scope "col" ] [ text "ID" ]
+                , th [ scope "col" ] [ text "Url" ]
+                , th [ scope "col" ] [ text "Login" ]
+                , th [ scope "col" ] [ text "Avatar" ]
+                ]
+            ]
+        , tbody []
+            (List.map
+                (\user ->
+                    tr []
+                        [ td [] [ text <| String.fromInt user.id ]
+                        , td [] [ text user.url ]
+                        , td [] [ text user.login ]
+                        , td [] [ text user.avatarUrl ]
+                        ]
+                )
+                model.users
+            )
+        ]
+
+
 view : Model -> Browser.Document Msg
 view model =
     { title = "IP Web"
@@ -349,6 +280,18 @@ view model =
             [ text "The current URL is: "
             , b [] [ text (Url.toString model.url) ]
             , hr [] []
+            , case fromUrl model.url of
+                Home ->
+                    text "Welcome Home!"
+
+                About ->
+                    text "This is the 'About' page"
+
+                Users ->
+                    userTable model
+
+                _ ->
+                    text "Page Not Found"
             ]
         ]
     }

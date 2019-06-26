@@ -1,4 +1,4 @@
-import { Elm } from './src/Main.elm'
+import { Elm } from './Main.elm'
 
 if (module.hot) {
     module.hot.dispose(() => {
@@ -6,17 +6,17 @@ if (module.hot) {
     });
 }
 
-const storedState = localStorage.getItem('cache')
-const startingState = storedState ? localStorage.getItem('cache') : null
+// const storedState = localStorage.getItem('cache')
+// const startingState = storedState ? localStorage.getItem('cache') : null
 const app = Elm.Main.init({
   node: document.querySelector('main'),
-  flags: startingState,
+  // flags: startingState,
 })
 
-app.ports.cache.subscribe((data) => {
-  console.log(data)
-  // localStorage.setItem('cache', JSON.stringify(data))
-})
+// app.ports.cache.subscribe((data) => {
+//   console.log(data)
+//   // localStorage.setItem('cache', JSON.stringify(data))
+// })
 
 // app.ports.getCache.subscribe(() => {
 //   console.log(localStorage.getItem('cache'))
