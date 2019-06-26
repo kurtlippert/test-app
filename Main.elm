@@ -1,4 +1,4 @@
-module Main exposing (HttpRequest(..), Model, Msg(..), Route(..), User, emptyUser, failureMessages, fromUrl, init, main, routeParser, subscriptions, topNav, update, userDecoder, view, viewLink)
+port module Main exposing (main)
 
 import Base64
 import Browser
@@ -31,9 +31,14 @@ main =
 
 
 
+-- PORTS
+
+
+port printUser : Json.Encode.Value -> Cmd msg
+
+
+
 -- MODEL
--- type HttpResponse
---     = UsersResponse (List User)
 
 
 type HttpRequest
@@ -86,7 +91,7 @@ getUsersRequest =
     Http.request
         { method = "GET"
         , headers = []
-        , url = "https://api.github.com/users"
+        , url = "https://api.github.com/users?since=0&per_page=5"
         , body = Http.emptyBody
         , expect = Http.expectJson GotUsers usersDecoder
         , timeout = Nothing
@@ -94,42 +99,25 @@ getUsersRequest =
         }
 
 
-
--- type alias UserInfo =
---     { email : String
---     , membership : Membership
---     }
--- type alias LoginResponse =
---     { token : Maybe String
---     , email : Maybe String
---     , membership : Maybe Membership
---     , message : Maybe String
---     }
-
-
 type alias User =
     { id : Int
     , url : String
     , login : String
     , avatarUrl : String
-    }
-
-
-emptyUser =
-    { id = 0
-    , url = ""
-    , login = ""
-    , avatarUrl = ""
+    , gistsUrl : String
+    , reposUrl : String
     }
 
 
 userDecoder : Decoder User
 userDecoder =
-    Json.Decode.map4 User
+    Json.Decode.map6 User
         (Json.Decode.field "id" Json.Decode.int)
         (Json.Decode.field "url" Json.Decode.string)
         (Json.Decode.field "login" Json.Decode.string)
         (Json.Decode.field "avatar_url" Json.Decode.string)
+        (Json.Decode.field "gists_url" Json.Decode.string)
+        (Json.Decode.field "repos_url" Json.Decode.string)
 
 
 usersDecoder : Decoder (List User)
@@ -137,27 +125,42 @@ usersDecoder =
     Json.Decode.list userDecoder
 
 
+userEncoder : User -> Json.Encode.Value
+userEncoder user =
+    Json.Encode.object
+        [ ( "id", Json.Encode.int user.id )
+        , ( "url", Json.Encode.string user.url )
+        , ( "login", Json.Encode.string user.login )
+        , ( "avatar_url", Json.Encode.string user.avatarUrl )
+        , ( "gists_url", Json.Encode.string user.gistsUrl )
+        , ( "repos_url", Json.Encode.string user.reposUrl )
+        ]
 
--- userEncoder : User -> Json.Encode.Value
--- userEncoder user =
---     Json.Encode.object
---         [ ( "id", Json.Encode.string user.id )
---         , ( "url", Json.Encode.string user.url )
---         , ( "login", Json.Encode.string user.login )
---         , ( "avatar_url", Json.Encode.string user.avatarUrl )
---         ]
+
+usersEncoder : List User -> Json.Encode.Value
+usersEncoder users =
+    Json.Encode.list userEncoder users
+
+
+
+-- UPDATE
 
 
 type Msg
-    = LinkClicked Browser.UrlRequest
+    = PrintUser User
+    | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | GetUsers
     | GotUsers (Result Http.Error (List User))
+    | SelectUser User
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        PrintUser user ->
+            ( model, printUser <| userEncoder user )
+
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
@@ -187,20 +190,20 @@ update msg model =
                 Err _ ->
                     ( { model | httpRequest = Failure }, Cmd.none )
 
+        SelectUser user ->
+            -- let
+            --     _ =
+            --         Debug.log "user" user
+            -- in
+            ( model, Cmd.none )
 
 
--- GotCache cache ->
---     let
---         _ =
---             Debug.log "cache" cache
---     in
---     ( model, Cmd.none )
--- SUBSCRIPTIONS
+
+-- SUBS
 
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    -- fromCache GotCache
     Sub.none
 
 
@@ -208,7 +211,7 @@ subscriptions _ =
 -- VIEW
 
 
-viewLink : String -> String -> List String -> Html msg
+viewLink : String -> String -> List String -> Html Msg
 viewLink path name classes =
     a [ class <| String.join " " classes, href path ]
         [ text name ]
@@ -245,30 +248,52 @@ topNav model =
         ]
 
 
-userTable : Model -> Html Msg
-userTable model =
-    table [ class "table" ]
-        [ thead []
-            [ tr []
-                [ th [ scope "col" ] [ text "ID" ]
-                , th [ scope "col" ] [ text "Url" ]
-                , th [ scope "col" ] [ text "Login" ]
-                , th [ scope "col" ] [ text "Avatar" ]
-                ]
+userTable : Model -> List String -> Html Msg
+userTable model classes =
+    div [ class <| String.join " " classes ]
+        [ div [ class "form-group" ]
+            [ label [] [ text "Filter" ]
+            , input [ class "form-control" ] []
             ]
-        , tbody []
-            (List.map
-                (\user ->
-                    tr []
-                        [ td [ class "align-middle" ] [ text <| String.fromInt user.id ]
-                        , td [ class "align-middle" ] [ text user.url ]
-                        , td [ class "align-middle" ] [ text user.login ]
-                        , td [ class "align-middle" ] [ img [ src user.avatarUrl, height 42, width 42 ] [] ]
-                        ]
+        , table [ class "table table-hover" ]
+            [ thead []
+                [ tr []
+                    [ th [ scope "col" ] [ text "ID" ]
+                    , th [ scope "col" ] [ text "Url" ]
+                    , th [ scope "col" ] [ text "Login" ]
+                    , th [ scope "col" ] [ text "Avatar" ]
+                    ]
+                ]
+            , tbody []
+                (List.map
+                    (\user ->
+                        tr [ onClick <| PrintUser user ]
+                            [ td [ class "align-middle" ] [ text <| String.fromInt user.id ]
+                            , td [ class "align-middle" ] [ text user.url ]
+                            , td [ class "align-middle" ] [ text user.login ]
+                            , td [ class "align-middle" ] [ img [ src user.avatarUrl, height 42, width 42 ] [] ]
+                            ]
+                    )
+                    model.users
                 )
-                model.users
-            )
+            ]
         ]
+
+
+mainContent : Model -> Route -> Html Msg
+mainContent model route =
+    case route of
+        Home ->
+            div [] [ text "Welcome Home!", userTable model [ "invisible" ] ]
+
+        About ->
+            div [] [ text "This is the 'About' page", userTable model [ "invisible" ] ]
+
+        Users ->
+            userTable model []
+
+        _ ->
+            div [] [ text "Page Not Found!", userTable model [ "invisible" ] ]
 
 
 view : Model -> Browser.Document Msg
@@ -280,18 +305,7 @@ view model =
             [ text "The current URL is: "
             , b [] [ text (Url.toString model.url) ]
             , hr [] []
-            , case fromUrl model.url of
-                Home ->
-                    text "Welcome Home!"
-
-                About ->
-                    text "This is the 'About' page"
-
-                Users ->
-                    userTable model
-
-                _ ->
-                    text "Page Not Found"
+            , mainContent model (fromUrl model.url)
             ]
         ]
     }
