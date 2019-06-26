@@ -260,10 +260,10 @@ userTable model =
             (List.map
                 (\user ->
                     tr []
-                        [ td [] [ text <| String.fromInt user.id ]
-                        , td [] [ text user.url ]
-                        , td [] [ text user.login ]
-                        , td [] [ text user.avatarUrl ]
+                        [ td [ class "align-middle" ] [ text <| String.fromInt user.id ]
+                        , td [ class "align-middle" ] [ text user.url ]
+                        , td [ class "align-middle" ] [ text user.login ]
+                        , td [ class "align-middle" ] [ img [ src user.avatarUrl, height 42, width 42 ] [] ]
                         ]
                 )
                 model.users
