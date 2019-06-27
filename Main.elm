@@ -1,6 +1,5 @@
 port module Main exposing (main)
 
-import Base64
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (..)
@@ -8,10 +7,9 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode exposing (Decoder, field, string)
-import Json.Decode.Pipeline exposing (optional, required)
 import Json.Encode
 import Url
-import Url.Parser exposing ((</>), Parser, int, map, oneOf, s, string, top)
+import Url.Parser exposing (Parser, int, map, oneOf, s, string, top)
 
 
 
@@ -65,6 +63,7 @@ type alias Model =
     }
 
 
+emptyUser : User
 emptyUser =
     { id = 0
     , url = ""
@@ -76,7 +75,7 @@ emptyUser =
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init flags url key =
+init _ url key =
     ( Model Loading [] emptyUser [] key url, getUsersRequest )
 
 
@@ -285,7 +284,7 @@ update msg model =
         GotGists response ->
             case response of
                 Ok gists ->
-                    ( { model | httpRequest = Success }, Cmd.none )
+                    ( { model | httpRequest = Success, gists = gists }, Cmd.none )
 
                 Err _ ->
                     ( { model | httpRequest = Failure <| "Failed to get gists for user: " ++ model.selectedUser.login }, Cmd.none )
@@ -323,8 +322,8 @@ failureMessages httpRequest =
             div [] []
 
 
-topNav : Model -> Html Msg
-topNav model =
+topNav : Html Msg
+topNav =
     nav [ class "navbar navbar-expand-sm navbar-light bg-light" ]
         [ a [ class "navbar-brand" ]
             [ text "Elm Parcel Starter" ]
@@ -375,7 +374,10 @@ userTable model classes =
             ]
         ]
 
-
+{-| The reason I've added the 'userTable' to all views (just hidden)
+is a hacky solution to getting the spacing to be consistent across
+all the views. Removing this causes some slight spacing changes to be observed.
+-}
 mainContent : Model -> Route -> Html Msg
 mainContent model route =
     case route of
@@ -396,7 +398,7 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "IP Web"
     , body =
-        [ topNav model
+        [ topNav
         , div [ class "container my-5" ]
             [ text "The current URL is: "
             , b [] [ text (Url.toString model.url) ]
