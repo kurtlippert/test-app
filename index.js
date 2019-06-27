@@ -10,4 +10,4 @@ const app = Elm.Main.init({
   node: document.querySelector('main')
 })
 
-app.ports.printUser.subscribe(user => console.log(user))
+app.ports.printModel.subscribe(model => console.log(model))

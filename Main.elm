@@ -34,7 +34,7 @@ main =
 -- PORTS
 
 
-port printUser : Json.Encode.Value -> Cmd msg
+port printModel : Json.Encode.Value -> Cmd msg
 
 
 
@@ -42,7 +42,7 @@ port printUser : Json.Encode.Value -> Cmd msg
 
 
 type HttpRequest
-    = Failure
+    = Failure String
     | Loading
     | Success
 
@@ -58,14 +58,26 @@ type Route
 type alias Model =
     { httpRequest : HttpRequest
     , users : List User
+    , selectedUser : User
+    , gists : List Gist
     , key : Nav.Key
     , url : Url.Url
     }
 
 
+emptyUser =
+    { id = 0
+    , url = ""
+    , login = ""
+    , avatarUrl = ""
+    , gistsUrl = ""
+    , reposUrl = ""
+    }
+
+
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( Model Loading [] key url, getUsersRequest )
+    ( Model Loading [] emptyUser [] key url, getUsersRequest )
 
 
 
@@ -97,6 +109,37 @@ getUsersRequest =
         , timeout = Nothing
         , tracker = Nothing
         }
+
+
+{-| We obtain the 'gists\_url' in this form:
+"<https://api.github.com/users/:username/gists{/gist_id}">
+The idea is to replace the '{/gist\_id}' bit with the relevant id (or empty string)
+if you want all the gists. Github makes it easy, as we just have to replace
+that bit with what we want
+-}
+prepareGithubUserGistsUrl : String -> String -> String
+prepareGithubUserGistsUrl gistIdOrEmptyString gistUrl =
+    String.replace "{/gist_id}" gistIdOrEmptyString gistUrl
+
+
+{-| We want to obtain all of a user's gists
+So we'll make a call to 'prepareGithubUserGistsUrl' with empty string
+-}
+getUserGists : User -> Cmd Msg
+getUserGists user =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url = prepareGithubUserGistsUrl "" user.gistsUrl
+        , body = Http.emptyBody
+        , expect = Http.expectJson GotGists gistsDecoder
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+
+-- TYPE ALIAS, DECODERS / ENCODERS
 
 
 type alias User =
@@ -142,24 +185,70 @@ usersEncoder users =
     Json.Encode.list userEncoder users
 
 
+type alias Gist =
+    { id : Int
+    , htmlUrl : String
+    }
+
+
+gistDecoder : Decoder Gist
+gistDecoder =
+    Json.Decode.map2 Gist
+        (Json.Decode.field "id" Json.Decode.int)
+        (Json.Decode.field "html_url" Json.Decode.string)
+
+
+gistsDecoder : Decoder (List Gist)
+gistsDecoder =
+    Json.Decode.list gistDecoder
+
+
+gistEncoder : Gist -> Json.Encode.Value
+gistEncoder gist =
+    Json.Encode.object
+        [ ( "id", Json.Encode.int gist.id )
+        , ( "html_url", Json.Encode.string gist.htmlUrl )
+        ]
+
+
+gistsEncoder : List Gist -> Json.Encode.Value
+gistsEncoder gists =
+    Json.Encode.list gistEncoder gists
+
+
+{-| Maybe a little misleading because we don't actually care about all of the model
+Only the bits that have value printing out to the dev console
+Note: currently only using this to print out the model ('PrintModel' message)
+-}
+modelEncoder : Model -> Json.Encode.Value
+modelEncoder model =
+    Json.Encode.object
+        [ ( "users", usersEncoder model.users )
+        , ( "selectedUser", userEncoder model.selectedUser )
+        , ( "gists", gistsEncoder model.gists )
+        ]
+
+
 
 -- UPDATE
 
 
 type Msg
-    = PrintUser User
+    = PrintModel
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | GetUsers
     | GotUsers (Result Http.Error (List User))
+    | GetGists
+    | GotGists (Result Http.Error (List Gist))
     | SelectUser User
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        PrintUser user ->
-            ( model, printUser <| userEncoder user )
+        PrintModel ->
+            ( model, printModel <| modelEncoder model )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -180,7 +269,7 @@ update msg model =
                     )
 
         GetUsers ->
-            ( model, getUsersRequest )
+            ( { model | httpRequest = Loading }, getUsersRequest )
 
         GotUsers response ->
             case response of
@@ -188,14 +277,21 @@ update msg model =
                     ( { model | httpRequest = Success, users = users }, Cmd.none )
 
                 Err _ ->
-                    ( { model | httpRequest = Failure }, Cmd.none )
+                    ( { model | httpRequest = Failure "Failed to get users" }, Cmd.none )
+
+        GetGists ->
+            ( { model | httpRequest = Loading }, getUserGists model.selectedUser )
+
+        GotGists response ->
+            case response of
+                Ok gists ->
+                    ( { model | httpRequest = Success }, Cmd.none )
+
+                Err _ ->
+                    ( { model | httpRequest = Failure <| "Failed to get gists for user: " ++ model.selectedUser.login }, Cmd.none )
 
         SelectUser user ->
-            -- let
-            --     _ =
-            --         Debug.log "user" user
-            -- in
-            ( model, Cmd.none )
+            ( { model | selectedUser = user }, printModel <| modelEncoder model )
 
 
 
@@ -220,8 +316,8 @@ viewLink path name classes =
 failureMessages : HttpRequest -> Html Msg
 failureMessages httpRequest =
     case httpRequest of
-        Failure ->
-            div [ class "alert alert-danger" ] [ text "Unable to contact the server" ]
+        Failure message ->
+            div [ class "alert alert-danger" ] [ text message ]
 
         _ ->
             div [] []
@@ -267,7 +363,7 @@ userTable model classes =
             , tbody []
                 (List.map
                     (\user ->
-                        tr [ onClick <| PrintUser user ]
+                        tr [ onClick <| SelectUser user ]
                             [ td [ class "align-middle" ] [ text <| String.fromInt user.id ]
                             , td [ class "align-middle" ] [ text user.url ]
                             , td [ class "align-middle" ] [ text user.login ]
