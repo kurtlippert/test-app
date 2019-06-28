@@ -9,7 +9,7 @@ import Http
 import Json.Decode exposing (Decoder, field, string)
 import Json.Encode
 import Url
-import Url.Parser exposing (Parser, int, map, oneOf, s, string, top)
+import Url.Parser exposing ((</>), Parser, int, map, oneOf, s, string, top)
 
 
 
@@ -50,6 +50,7 @@ type Route
     | Login
     | About
     | Users
+    | UserRoute Int
     | NotFound
 
 
@@ -89,6 +90,7 @@ routeParser =
         [ map Home top
         , map About (s "about")
         , map Users (s "users")
+        , map UserRoute (s "users" </> int)
         ]
 
 
@@ -385,19 +387,22 @@ userTable model classes =
                 , ( "is-active", isUserSelected model.selectedUser )
                 ]
             ]
-            [ div [ class "modal-background", onClick <| UnSelectUser ] []
+            [ div [ class "modal-background", onClick UnSelectUser ] []
             , div [ class "modal-content" ]
                 [ div [ class "card" ]
                     [ userContent <|
                         getSomeUser model.selectedUser
                     ]
                 ]
-            , button [ class "modal-close is-large", onClick <| UnSelectUser ]
+            , button [ class "modal-close is-large", onClick UnSelectUser ]
                 []
             ]
         ]
 
 
+{-| Right now just the content for the modal popup
+We could reuse this for the "users/:userId" route
+-}
 userContent : User -> Html Msg
 userContent user =
     div [ class "card-content" ]
@@ -447,6 +452,9 @@ mainContent model route =
 
         Users ->
             userTable model []
+
+        UserRoute userId ->
+            div [] [ text <| "User ID: " ++ String.fromInt userId, br [] [], text "(in future, make http request to get user info" ]
 
         _ ->
             div [] [ text "Page Not Found!", userTable model [ "invisible" ] ]
