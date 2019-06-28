@@ -316,38 +316,21 @@ subscriptions _ =
 -- VIEW
 
 
-viewLink : String -> String -> List String -> Html Msg
-viewLink path name classes =
-    a [ class <| String.join " " classes, href path ]
-        [ text name ]
-
-
-failureMessages : HttpRequest -> Html Msg
-failureMessages httpRequest =
-    case httpRequest of
-        Failure message ->
-            div [ class "alert alert-danger" ] [ text message ]
-
-        _ ->
-            div [] []
-
-
 topNav : Html Msg
 topNav =
-    nav [ class "navbar navbar-expand-sm navbar-light bg-light" ]
-        [ a [ class "navbar-brand" ]
-            [ text "Elm Parcel Starter" ]
-        , div []
-            [ ul [ class "navbar-nav" ]
-                [ li [ class "nav-item" ]
-                    [ viewLink "/" "Home" [ "nav-link" ]
-                    ]
-                , li [ class "nav-item" ]
-                    [ viewLink "/about" "About" [ "nav-link" ]
-                    ]
-                , li [ class "nav-item" ]
-                    [ viewLink "/users" "Users" [ "nav-link" ]
-                    ]
+    nav [ class "navbar is-light" ]
+        [ div [ class "navbar-brand" ]
+            [ a [ class "navbar-item", href "/" ]
+                [ text "Elm Parcel Starter" ]
+            ]
+        , div [ class "navbar-menu" ]
+            [ div [ class "navbar-start" ]
+                [ a [ class "navbar-item", href "/" ]
+                    [ text "Home" ]
+                , a [ class "navbar-item", href "/about" ]
+                    [ text "About" ]
+                , a [ class "navbar-item", href "/users" ]
+                    [ text "Users" ]
                 ]
             ]
         ]
@@ -357,10 +340,10 @@ userTable : Model -> List String -> Html Msg
 userTable model classes =
     div [ class <| String.join " " classes ]
         [ div [ class "form-group" ]
-            [ label [] [ text "Filter" ]
-            , input [ class "form-control" ] []
+            [ input [ class "input", placeholder "Filter", type_ "text" ]
+                []
             ]
-        , table [ class "table table-hover" ]
+        , table [ class "table is-hoverable is-fullwidth mt-3" ]
             [ thead []
                 [ tr []
                     [ th [ scope "col" ] [ text "ID" ]
@@ -381,30 +364,6 @@ userTable model classes =
                     )
                     model.users
                 )
-            ]
-        , div [ class "modal", attribute "tabindex" "-1", id "userDetailsModal", attribute "role" "dialog" ]
-            [ div [ class "modal-dialog" ]
-                [ div [ class "modal-content" ]
-                    [ div [ class "modal-header" ]
-                        [ h5 [ class "modal-title" ]
-                            [ text "Modal title" ]
-                        , button [ class "close", attribute "data-dismiss" "modal", type_ "button" ]
-                            [ span [ attribute "aria-hidden" "true" ]
-                                [ text "×" ]
-                            ]
-                        ]
-                    , div [ class "modal-body" ]
-                        [ p []
-                            [ text "Modal body text goes here." ]
-                        ]
-                    , div [ class "modal-footer" ]
-                        [ button [ class "btn btn-primary", type_ "button" ]
-                            [ text "Save changes" ]
-                        , button [ class "btn btn-secondary", attribute "data-dismiss" "modal", type_ "button" ]
-                            [ text "Close" ]
-                        ]
-                    ]
-                ]
             ]
         ]
 
