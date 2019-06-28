@@ -238,6 +238,16 @@ getSomeUser maybeUser =
             emptyUser
 
 
+isUserSelected : Maybe User -> Bool
+isUserSelected maybeUser =
+    case maybeUser of
+        Just user ->
+            True
+
+        Nothing ->
+            False
+
+
 
 -- UPDATE
 
@@ -251,6 +261,7 @@ type Msg
     | GetGists
     | GotGists (Result Http.Error (List Gist))
     | SelectUser User
+    | UnSelectUser
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -301,6 +312,9 @@ update msg model =
 
         SelectUser user ->
             ( { model | selectedUser = Just user }, printModel <| modelEncoder model )
+
+        UnSelectUser ->
+            ( { model | selectedUser = Nothing }, printModel <| modelEncoder model )
 
 
 
@@ -365,6 +379,56 @@ userTable model classes =
                     model.users
                 )
             ]
+        , div
+            [ classList
+                [ ( "modal", True )
+                , ( "is-active", isUserSelected model.selectedUser )
+                ]
+            ]
+            [ div [ class "modal-background", onClick <| UnSelectUser ] []
+            , div [ class "modal-content" ]
+                [ div [ class "card" ]
+                    [ userContent <|
+                        getSomeUser model.selectedUser
+                    ]
+                ]
+            , button [ class "modal-close is-large", onClick <| UnSelectUser ]
+                []
+            ]
+        ]
+
+
+userContent : User -> Html Msg
+userContent user =
+    div [ class "card-content" ]
+        [ div [ class "media" ]
+            [ div [ class "media-left" ]
+                [ figure [ class "image is-48x48" ]
+                    [ img [ alt "Placeholder image", src user.avatarUrl ]
+                        []
+                    ]
+                ]
+            , div [ class "media-content" ]
+                [ p [ class "title is-4" ]
+                    [ text user.login ]
+                , p [ class "subtitle is-6" ]
+                    [ text "@johnsmith" ]
+                ]
+            ]
+        , div [ class "content" ]
+            [ text "Lorem ipsum dolor sit amet, consectetur adipiscing elit.      Phasellus nec iaculis mauris. "
+            , a []
+                [ text "@bulmaio" ]
+            , text ".      "
+            , a [ href "#" ]
+                [ text "#css" ]
+            , a [ href "#" ]
+                [ text "#responsive" ]
+            , br []
+                []
+            , time [ datetime "2016-1-1" ]
+                [ text "11:09 PM - 1 Jan 2016" ]
+            ]
         ]
 
 
@@ -390,7 +454,7 @@ mainContent model route =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "IP Web"
+    { title = "Elm Parcel Starter"
     , body =
         [ topNav
         , div [ class "container my-5" ]
