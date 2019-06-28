@@ -320,7 +320,7 @@ topNav : Html Msg
 topNav =
     nav [ class "navbar is-light" ]
         [ div [ class "navbar-brand" ]
-            [ a [ class "navbar-item", href "/" ]
+            [ a [ class "navbar-item subtitle font-weight-bold", href "/" ]
                 [ text "Elm Parcel Starter" ]
             ]
         , div [ class "navbar-menu" ]
@@ -370,7 +370,7 @@ userTable model classes =
 
 {-| The reason I've added the 'userTable' to all views (just hidden)
 is a hacky solution to getting the spacing to be consistent across
-all the views. Removing this causes some slight spacing changes to be observed.
+all the views. If you remove it you'll see the spacing change from route to route
 -}
 mainContent : Model -> Route -> Html Msg
 mainContent model route =
