@@ -56,7 +56,7 @@ type Route
 type alias Model =
     { httpRequest : HttpRequest
     , users : List User
-    , selectedUser : User
+    , selectedUser : Maybe User
     , gists : List Gist
     , key : Nav.Key
     , url : Url.Url
@@ -76,7 +76,7 @@ emptyUser =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( Model Loading [] emptyUser [] key url, getUsersRequest )
+    ( Model Loading [] Nothing [] key url, getUsersRequest )
 
 
 
@@ -223,9 +223,19 @@ modelEncoder : Model -> Json.Encode.Value
 modelEncoder model =
     Json.Encode.object
         [ ( "users", usersEncoder model.users )
-        , ( "selectedUser", userEncoder model.selectedUser )
+        , ( "selectedUser", userEncoder <| getSomeUser model.selectedUser )
         , ( "gists", gistsEncoder model.gists )
         ]
+
+
+getSomeUser : Maybe User -> User
+getSomeUser maybeUser =
+    case maybeUser of
+        Just user ->
+            user
+
+        Nothing ->
+            emptyUser
 
 
 
@@ -279,7 +289,7 @@ update msg model =
                     ( { model | httpRequest = Failure "Failed to get users" }, Cmd.none )
 
         GetGists ->
-            ( { model | httpRequest = Loading }, getUserGists model.selectedUser )
+            ( { model | httpRequest = Loading }, getUserGists <| getSomeUser model.selectedUser )
 
         GotGists response ->
             case response of
@@ -287,10 +297,10 @@ update msg model =
                     ( { model | httpRequest = Success, gists = gists }, Cmd.none )
 
                 Err _ ->
-                    ( { model | httpRequest = Failure <| "Failed to get gists for user: " ++ model.selectedUser.login }, Cmd.none )
+                    ( { model | httpRequest = Failure <| "Failed to get gists for user: " ++ (getSomeUser model.selectedUser).login }, Cmd.none )
 
         SelectUser user ->
-            ( { model | selectedUser = user }, printModel <| modelEncoder model )
+            ( { model | selectedUser = Just user }, printModel <| modelEncoder model )
 
 
 
@@ -362,7 +372,7 @@ userTable model classes =
             , tbody []
                 (List.map
                     (\user ->
-                        tr [ onClick <| SelectUser user ]
+                        tr [ attribute "data-toggle" "modal", attribute "data-target" "#userDetailsModal", onClick <| SelectUser user ]
                             [ td [ class "align-middle" ] [ text <| String.fromInt user.id ]
                             , td [ class "align-middle" ] [ text user.url ]
                             , td [ class "align-middle" ] [ text user.login ]
@@ -372,7 +382,32 @@ userTable model classes =
                     model.users
                 )
             ]
+        , div [ class "modal", attribute "tabindex" "-1", id "userDetailsModal", attribute "role" "dialog" ]
+            [ div [ class "modal-dialog" ]
+                [ div [ class "modal-content" ]
+                    [ div [ class "modal-header" ]
+                        [ h5 [ class "modal-title" ]
+                            [ text "Modal title" ]
+                        , button [ class "close", attribute "data-dismiss" "modal", type_ "button" ]
+                            [ span [ attribute "aria-hidden" "true" ]
+                                [ text "×" ]
+                            ]
+                        ]
+                    , div [ class "modal-body" ]
+                        [ p []
+                            [ text "Modal body text goes here." ]
+                        ]
+                    , div [ class "modal-footer" ]
+                        [ button [ class "btn btn-primary", type_ "button" ]
+                            [ text "Save changes" ]
+                        , button [ class "btn btn-secondary", attribute "data-dismiss" "modal", type_ "button" ]
+                            [ text "Close" ]
+                        ]
+                    ]
+                ]
+            ]
         ]
+
 
 {-| The reason I've added the 'userTable' to all views (just hidden)
 is a hacky solution to getting the spacing to be consistent across
