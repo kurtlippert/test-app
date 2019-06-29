@@ -113,7 +113,7 @@ getUsersRequest skip take query =
             else
                 "https://api.github.com/search/users?q="
                     ++ query
-                    ++ "&since="
+                    ++ " in:login&since="
                     ++ String.fromInt skip
                     ++ "&per_page="
                     ++ String.fromInt take
@@ -276,7 +276,7 @@ type Msg
     | PrintMessage String
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | GetUsers
+    | GetUsers String
     | GotUsers (Result Http.Error (List User))
     | GetGists
     | GotGists (Result Http.Error (List Gist))
@@ -316,8 +316,8 @@ update msg model =
                     , Cmd.none
                     )
 
-        GetUsers ->
-            ( { model | httpRequest = Loading }, getUsersRequest 0 5 "" )
+        GetUsers query ->
+            ( { model | httpRequest = Loading }, getUsersRequest 0 5 query )
 
         GotUsers response ->
             case response of
@@ -403,7 +403,7 @@ userTable : Model -> List String -> Html Msg
 userTable model classes =
     div [ class <| String.join " " classes ]
         [ div [ class "form-group" ]
-            [ input [ class "input", placeholder "Filter", type_ "text", onInput PrintMessage ]
+            [ input [ class "input", placeholder "Filter", type_ "text", onInput GetUsers ]
                 []
             ]
         , table [ class "table is-hoverable is-fullwidth mt-3" ]
