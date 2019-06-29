@@ -58,6 +58,7 @@ type alias Model =
     { httpRequest : HttpRequest
     , users : List User
     , selectedUser : Maybe User
+    , burgerMenuActive : Bool
     , gists : List Gist
     , key : Nav.Key
     , url : Url.Url
@@ -77,7 +78,7 @@ emptyUser =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( Model Loading [] Nothing [] key url, getUsersRequest )
+    ( Model Loading [] Nothing False [] key url, getUsersRequest 0 5 "" )
 
 
 
@@ -99,12 +100,28 @@ fromUrl url =
     Maybe.withDefault NotFound (Url.Parser.parse routeParser url)
 
 
-getUsersRequest : Cmd Msg
-getUsersRequest =
+getUsersRequest : Int -> Int -> String -> Cmd Msg
+getUsersRequest skip take query =
+    let
+        url =
+            if query == "" then
+                "https://api.github.com/users?since="
+                    ++ String.fromInt skip
+                    ++ "&per_page="
+                    ++ String.fromInt take
+
+            else
+                "https://api.github.com/search/users?q="
+                    ++ query
+                    ++ "&since="
+                    ++ String.fromInt skip
+                    ++ "&per_page="
+                    ++ String.fromInt take
+    in
     Http.request
         { method = "GET"
         , headers = []
-        , url = "https://api.github.com/users?since=0&per_page=5"
+        , url = url
         , body = Http.emptyBody
         , expect = Http.expectJson GotUsers usersDecoder
         , timeout = Nothing
@@ -113,7 +130,7 @@ getUsersRequest =
 
 
 {-| We obtain the 'gists\_url' in this form:
-"<https://api.github.com/users/:username/gists{/gist_id}">
+"<https://api.github.com/users/:username/gists{/gist_id}>"
 The idea is to replace the '{/gist\_id}' bit with the relevant id (or empty string)
 if you want all the gists. Github makes it easy, as we just have to replace
 that bit with what we want
@@ -256,6 +273,7 @@ isUserSelected maybeUser =
 
 type Msg
     = PrintModel
+    | PrintMessage String
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | GetUsers
@@ -264,6 +282,7 @@ type Msg
     | GotGists (Result Http.Error (List Gist))
     | SelectUser User
     | UnSelectUser
+    | ToggleBurgerMenu
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -271,6 +290,13 @@ update msg model =
     case msg of
         PrintModel ->
             ( model, printModel <| modelEncoder model )
+
+        PrintMessage someInput ->
+            let
+                _ =
+                    Debug.log "input" someInput
+            in
+            ( model, Cmd.none )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -291,7 +317,7 @@ update msg model =
                     )
 
         GetUsers ->
-            ( { model | httpRequest = Loading }, getUsersRequest )
+            ( { model | httpRequest = Loading }, getUsersRequest 0 5 "" )
 
         GotUsers response ->
             case response of
@@ -318,6 +344,9 @@ update msg model =
         UnSelectUser ->
             ( { model | selectedUser = Nothing }, printModel <| modelEncoder model )
 
+        ToggleBurgerMenu ->
+            ( { model | burgerMenuActive = not model.burgerMenuActive }, Cmd.none )
+
 
 
 -- SUBS
@@ -332,14 +361,32 @@ subscriptions _ =
 -- VIEW
 
 
-topNav : Html Msg
-topNav =
+topNav : Model -> Html Msg
+topNav model =
     nav [ class "navbar is-light" ]
         [ div [ class "navbar-brand" ]
-            [ a [ class "navbar-item subtitle font-weight-bold", href "/" ]
+            [ a [ class "navbar-item font-weight-bold", href "/" ]
                 [ text "Elm Parcel Starter" ]
+            , span
+                [ classList
+                    [ ( "navbar-burger burger", True )
+                    , ( "is-active", model.burgerMenuActive )
+                    ]
+                , attribute "data-target" "mainNavbar"
+                , onClick ToggleBurgerMenu
+                ]
+                [ span [] []
+                , span [] []
+                , span [] []
+                ]
             ]
-        , div [ class "navbar-menu" ]
+        , div
+            [ classList
+                [ ( "navbar-menu", True )
+                , ( "is-active", model.burgerMenuActive )
+                ]
+            , id "mainNavbar"
+            ]
             [ div [ class "navbar-start" ]
                 [ a [ class "navbar-item", href "/" ]
                     [ text "Home" ]
@@ -356,7 +403,7 @@ userTable : Model -> List String -> Html Msg
 userTable model classes =
     div [ class <| String.join " " classes ]
         [ div [ class "form-group" ]
-            [ input [ class "input", placeholder "Filter", type_ "text" ]
+            [ input [ class "input", placeholder "Filter", type_ "text", onInput PrintMessage ]
                 []
             ]
         , table [ class "table is-hoverable is-fullwidth mt-3" ]
@@ -371,7 +418,7 @@ userTable model classes =
             , tbody []
                 (List.map
                     (\user ->
-                        tr [ attribute "data-toggle" "modal", attribute "data-target" "#userDetailsModal", onClick <| SelectUser user ]
+                        tr [ onClick <| SelectUser user ]
                             [ td [ class "align-middle" ] [ text <| String.fromInt user.id ]
                             , td [ class "align-middle" ] [ text user.url ]
                             , td [ class "align-middle" ] [ text user.login ]
@@ -421,7 +468,7 @@ userContent user =
                 ]
             ]
         , div [ class "content" ]
-            [ text "Lorem ipsum dolor sit amet, consectetur adipiscing elit.      Phasellus nec iaculis mauris. "
+            [ text "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus nec iaculis mauris."
             , a []
                 [ text "@bulmaio" ]
             , text ".      "
@@ -464,8 +511,8 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "Elm Parcel Starter"
     , body =
-        [ topNav
-        , div [ class "container my-5" ]
+        [ topNav model
+        , div [ class "container m-5" ]
             [ text "The current URL is: "
             , b [] [ text (Url.toString model.url) ]
             , hr [] []
