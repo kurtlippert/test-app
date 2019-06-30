@@ -36,6 +36,8 @@ port printModel : Json.Encode.Value -> Cmd msg
 
 
 
+
+
 -- MODEL
 
 
@@ -43,6 +45,7 @@ type HttpRequest
     = Failure String
     | Loading
     | Success
+    | NoOp
 
 
 type Route
@@ -101,27 +104,48 @@ fromUrl url =
 
 
 getUsersRequest : Int -> Int -> String -> Cmd Msg
-getUsersRequest skip take query =
+getUsersRequest skip take filter =
     let
+        url : Url.Url
         url =
-            if query == "" then
-                "https://api.github.com/users?since="
-                    ++ String.fromInt skip
-                    ++ "&per_page="
-                    ++ String.fromInt take
+            if filter == "" then
+                { protocol = Url.Https
+                , host = "api.github.com"
+                , port_ = Nothing
+                , path = "/users"
+                , query =
+                    Just <|
+                        "since="
+                            ++ String.fromInt skip
+                            ++ "&per_page="
+                            ++ String.fromInt take
+                , fragment = Nothing
+                }
 
             else
-                "https://api.github.com/search/users?q="
-                    ++ query
-                    ++ " in:login&since="
-                    ++ String.fromInt skip
-                    ++ "&per_page="
-                    ++ String.fromInt take
+                { protocol = Url.Https
+                , host = "api.github.com"
+                , port_ = Nothing
+                , path = "/search/users"
+                , query =
+                    Just <|
+                        "q="
+                            ++ filter
+                            ++ "&since="
+                            ++ String.fromInt skip
+                            ++ "&per_page="
+                            ++ String.fromInt take
+                , fragment = Nothing
+                }
+    in
+    let
+        _ =
+            Debug.log "url" <| Url.toString url
     in
     Http.request
         { method = "GET"
         , headers = []
-        , url = url
+        , url = Url.toString url
         , body = Http.emptyBody
         , expect = Http.expectJson GotUsers usersDecoder
         , timeout = Nothing
@@ -247,6 +271,7 @@ modelEncoder model =
         ]
 
 
+
 getSomeUser : Maybe User -> User
 getSomeUser maybeUser =
     case maybeUser of
@@ -283,11 +308,15 @@ type Msg
     | SelectUser User
     | UnSelectUser
     | ToggleBurgerMenu
+    | ChangeHttpRequestStatus HttpRequest
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        ChangeHttpRequestStatus httpRequest ->
+            ( { model | httpRequest = httpRequest }, Cmd.none )
+
         PrintModel ->
             ( model, printModel <| modelEncoder model )
 
@@ -317,15 +346,38 @@ update msg model =
                     )
 
         GetUsers query ->
-            ( { model | httpRequest = Loading }, getUsersRequest 0 5 query )
+            let
+                _ =
+                    Debug.log "gettingUsers" query
+            in
+            ( { model | httpRequest = Loading }, getUsersRequest 0 10 query )
 
         GotUsers response ->
             case response of
                 Ok users ->
+                    let
+                        _ =
+                            Debug.log "gotUsers" <| List.length users
+                    in
                     ( { model | httpRequest = Success, users = users }, Cmd.none )
 
-                Err _ ->
-                    ( { model | httpRequest = Failure "Failed to get users" }, Cmd.none )
+                Err err ->
+                    let
+                        _ =
+                            Debug.log "Error getting users" err
+                    in
+                    case err of
+                        Http.BadBody errorMessage ->
+                            ( { model | httpRequest = Failure errorMessage }
+                            , Cmd.none
+                            )
+
+                        _ ->
+                            let
+                                _ = Debug.log "Error getting users" err
+                            in
+                            ( model, Cmd.none )
+                            
 
         GetGists ->
             ( { model | httpRequest = Loading }, getUserGists <| getSomeUser model.selectedUser )
@@ -483,6 +535,25 @@ userContent user =
             ]
         ]
 
+isNotFailure : HttpRequest -> Bool
+isNotFailure httpRequest  =
+    case httpRequest of
+        Failure _ -> False
+        _ -> True
+    
+
+notification : Model -> Html Msg
+notification model =
+    case model.httpRequest of
+        Failure message ->
+            div [ classList [ ("notification is-danger", True), ("d-none", model.httpRequest |> isNotFailure ) ]]
+                [ button [ class "delete", onClick <| ChangeHttpRequestStatus NoOp ] []
+                , text message
+                ]
+
+        _  ->
+            div [] []
+
 
 {-| The reason I've added the 'userTable' to all views (just hidden)
 is a hacky solution to getting the spacing to be consistent across
@@ -517,6 +588,7 @@ view model =
             , b [] [ text (Url.toString model.url) ]
             , hr [] []
             , mainContent model (fromUrl model.url)
+            , notification model
             ]
         ]
     }
