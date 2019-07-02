@@ -36,8 +36,6 @@ port printModel : Json.Encode.Value -> Cmd msg
 
 
 
-
-
 -- MODEL
 
 
@@ -106,37 +104,41 @@ fromUrl url =
 getUsersRequest : Int -> Int -> String -> Cmd Msg
 getUsersRequest skip take filter =
     let
-        url : Url.Url
-        url =
+        -- urlAndFilter : (Url.Url, Bool)
+        ( url, decoder ) =
             if filter == "" then
-                { protocol = Url.Https
-                , host = "api.github.com"
-                , port_ = Nothing
-                , path = "/users"
-                , query =
-                    Just <|
-                        "since="
-                            ++ String.fromInt skip
-                            ++ "&per_page="
-                            ++ String.fromInt take
-                , fragment = Nothing
-                }
+                ( { protocol = Url.Https
+                  , host = "api.github.com"
+                  , port_ = Nothing
+                  , path = "/users"
+                  , query =
+                        Just <|
+                            "since="
+                                ++ String.fromInt skip
+                                ++ "&per_page="
+                                ++ String.fromInt take
+                  , fragment = Nothing
+                  }
+                , usersDecoder
+                )
 
             else
-                { protocol = Url.Https
-                , host = "api.github.com"
-                , port_ = Nothing
-                , path = "/search/users"
-                , query =
-                    Just <|
-                        "q="
-                            ++ filter
-                            ++ "&since="
-                            ++ String.fromInt skip
-                            ++ "&per_page="
-                            ++ String.fromInt take
-                , fragment = Nothing
-                }
+                ( { protocol = Url.Https
+                  , host = "api.github.com"
+                  , port_ = Nothing
+                  , path = "/search/users"
+                  , query =
+                        Just <|
+                            "q="
+                                ++ filter
+                                ++ "&since="
+                                ++ String.fromInt skip
+                                ++ "&per_page="
+                                ++ String.fromInt take
+                  , fragment = Nothing
+                  }
+                , usersFilterDecoder
+                )
     in
     let
         _ =
@@ -147,7 +149,7 @@ getUsersRequest skip take filter =
         , headers = []
         , url = Url.toString url
         , body = Http.emptyBody
-        , expect = Http.expectJson GotUsers usersDecoder
+        , expect = Http.expectJson GotUsers decoder
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -210,6 +212,11 @@ usersDecoder =
     Json.Decode.list userDecoder
 
 
+usersFilterDecoder : Decoder (List User)
+usersFilterDecoder =
+    Json.Decode.field "items" usersDecoder
+
+
 userEncoder : User -> Json.Encode.Value
 userEncoder user =
     Json.Encode.object
@@ -269,7 +276,6 @@ modelEncoder model =
         , ( "selectedUser", userEncoder <| getSomeUser model.selectedUser )
         , ( "gists", gistsEncoder model.gists )
         ]
-
 
 
 getSomeUser : Maybe User -> User
@@ -350,7 +356,7 @@ update msg model =
                 _ =
                     Debug.log "gettingUsers" query
             in
-            ( { model | httpRequest = Loading }, getUsersRequest 0 10 query )
+            ( { model | httpRequest = Loading }, getUsersRequest 0 5 query )
 
         GotUsers response ->
             case response of
@@ -374,10 +380,10 @@ update msg model =
 
                         _ ->
                             let
-                                _ = Debug.log "Error getting users" err
+                                _ =
+                                    Debug.log "Error getting users" err
                             in
                             ( model, Cmd.none )
-                            
 
         GetGists ->
             ( { model | httpRequest = Loading }, getUserGists <| getSomeUser model.selectedUser )
@@ -535,23 +541,27 @@ userContent user =
             ]
         ]
 
+
 isNotFailure : HttpRequest -> Bool
-isNotFailure httpRequest  =
+isNotFailure httpRequest =
     case httpRequest of
-        Failure _ -> False
-        _ -> True
-    
+        Failure _ ->
+            False
+
+        _ ->
+            True
+
 
 notification : Model -> Html Msg
 notification model =
     case model.httpRequest of
         Failure message ->
-            div [ classList [ ("notification is-danger", True), ("d-none", model.httpRequest |> isNotFailure ) ]]
+            div [ classList [ ( "notification is-danger", True ), ( "d-none", model.httpRequest |> isNotFailure ) ] ]
                 [ button [ class "delete", onClick <| ChangeHttpRequestStatus NoOp ] []
                 , text message
                 ]
 
-        _  ->
+        _ ->
             div [] []
 
 
