@@ -2,9 +2,47 @@ port module Main exposing (main)
 
 import Browser
 import Browser.Navigation as Nav
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
+import Html
+    exposing
+        ( Html
+        , a
+        , b
+        , br
+        , button
+        , div
+        , figure
+        , hr
+        , img
+        , input
+        , nav
+        , p
+        , span
+        , table
+        , tbody
+        , td
+        , text
+        , th
+        , thead
+        , time
+        , tr
+        )
+import Html.Attributes
+    exposing
+        ( alt
+        , attribute
+        , class
+        , classList
+        , datetime
+        , height
+        , href
+        , id
+        , placeholder
+        , scope
+        , src
+        , type_
+        , width
+        )
+import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode exposing (Decoder, field, string)
 import Json.Encode
@@ -48,7 +86,6 @@ type HttpRequest
 
 type Route
     = Home
-    | Login
     | About
     | Users
     | UserRoute Int
@@ -291,7 +328,7 @@ getSomeUser maybeUser =
 isUserSelected : Maybe User -> Bool
 isUserSelected maybeUser =
     case maybeUser of
-        Just user ->
+        Just _ ->
             True
 
         Nothing ->
