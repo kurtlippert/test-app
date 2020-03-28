@@ -48,3 +48,20 @@ Add the yarn `bin` folder to your path
 ```bash
 export PATH="$(yarn global bin):$PATH"
 ```
+
+## TODOs
+
+Because I'd just like these tasks to stick with the code...
+
+### Mock Server
+
+#### Notes
+
+- JSON Server? Docker Container?
+- Would need an Express server (or of course the JSON server for something quick)
+  - Lets see what can be done with just the **JSON Server**
+
+#### TODO
+
+- Set up JSON Server
+  - JSON objects, some faker data?
