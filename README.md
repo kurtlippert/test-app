@@ -1,33 +1,19 @@
-# elm-parcel-starter
+# Elm Starter Kit (with Parcel and Bulma!)
 
 ## Setup
-**Install yarn package manager for your system**  
-_Windows_  
-1. Install Choco (will need local admin)
-2. Install yarn: `Choco install yarn`
 
-_Linux_  
-1. Check your system's package manager, yarn should be available
-2. `yarn <cmd>` (to run stuff)  
-
-**Add `yarn` commands to your path**  
-When you install yarn or npm packages globally, usually they get added to a `bin` folder here:  
-`/home/:user/(.yarn|.npm)/bin`  
-Ensure this is added to your path:  
-`export PATH="$PATH:/home/:user/(.yarn|.npm)/bin`
-
-**Install the parcel module bundler**  
 ```bash
-yarn global add parcel-bundler
-```  
+yarn
 
-**Install `elm` command-line tools**  
-```bash
-yarn global add elm elm-test elm-format
-```  
+# OR
 
-**Add `ElmLS` extension to your editor**  
-_Visual Studio Code_  
+npm install
+```
+
+### Add `ElmLS` extension to your editor
+
+Visual Studio Code
+
 1. Install `ElmLS`
 2. Enable the following settings
    - `elmLS.trace.server`: Enable/disable trace logging of client and server communication
@@ -35,14 +21,30 @@ _Visual Studio Code_
    - `elmLS.elmFormatPath`: The path to your elm-format executable (should work if installed globally, it's just `elm-format`)
    - `elmLS.elmTestPath`: The path to your elm-test executable (should work if installed globally, it's just `elm-test`)
 
-**Run the project**
+### Run the project
+
 ```bash
 yarn start
-```  
+```
+
+## Automated Management of the `elm.json` file
+
+```bash
+# Update 'elm.json' dependencies
+elm-json upgrade
+
+# Install new package
+elm-json install <PACKAGE_NAME>
+
+# For more commands
+elm-json --help
+```
 
 ## Troubleshooting Tips
+
 Globally installed npm modules may not work out-of-the-box with linux or osx.  
 Add the yarn `bin` folder to your path  
+
 ```bash
 export PATH="$(yarn global bin):$PATH"
 ```
