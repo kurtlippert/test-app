@@ -3,6 +3,7 @@
 // customizations
 // see https://bulma.io/documentation/customize/with-sass-cli/#6-add-your-own-bulma-styles
 // for some examples
+$navbar-breakpoint: 425px;
 
 // bulma
 @import "./node_modules/bulma/bulma.sass";
