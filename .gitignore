@@ -1,5 +1,6 @@
+!.vscode/settings.example.json
+.vscode/settings.json
 .cache
-.vscode
 dist
 elm-stuff
 node_modules
