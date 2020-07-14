@@ -26,4 +26,3 @@ yarn elm --help
 ## Recommended VSCode Extensions
 
 - elmtooling.elm-ls-vscode  
-  _de facto these days, zero config in my experience_
